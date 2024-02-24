@@ -66,10 +66,10 @@ set(
 	src/usbd_conf.c
 
 	include/can.h src/can.c
+	include/device.h
 	include/dfu.h src/dfu.c
 	include/gpio.h src/gpio.c
 	include/led.h src/led.c
-	include/queue.h src/queue.c
 	include/timer.h src/timer.c
 	include/util.h src/util.c
 
@@ -170,7 +170,7 @@ populate_ldscript(CPU_FAMILY STM32F042X6
 	RAM_START 0x20000000
 	RAM_SIZE 6k
 	STACK_SIZE 1k
-	HEAP_SIZE 1k
+	HEAP_SIZE 0k
 )
 
 populate_ldscript(CPU_FAMILY STM32F072XB
@@ -179,7 +179,7 @@ populate_ldscript(CPU_FAMILY STM32F072XB
 	RAM_START 0x20000000
 	RAM_SIZE 16k
 	STACK_SIZE 2k
-	HEAP_SIZE 1k
+	HEAP_SIZE 0k
 )
 
 populate_ldscript(CPU_FAMILY STM32F407XE
@@ -203,70 +203,57 @@ populate_ldscript(CPU_FAMILY STM32G0B1XK
 ######### commands for adding each target have a lot in common: make helper func.
 # Split into two categories, F042-based and F072-based.
 
-function(add_f042_target TGTNAME)
-	set(CPU_FAMILY STM32F042X6)
+function(add_target_common TGTNAME CPU_FAMILY)
 	add_executable(${TGTNAME}_fw ${SOURCE_FILES})
 	add_dependencies(${TGTNAME}_fw version_h)
 	target_include_directories(${TGTNAME}_fw PRIVATE include/ ${CMAKE_CURRENT_BINARY_DIR})
-	target_compile_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
-	target_compile_definitions(${TGTNAME}_fw PRIVATE BOARD_${TGTNAME} STM32F0)
-	target_link_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
 	target_link_options(${TGTNAME}_fw PRIVATE -T ${CPU_FAMILY}_processed.ld)
-	target_link_libraries(${TGTNAME}_fw PRIVATE STM32_HAL_STM32F042x6 STM32_USB_Device_Library_STM32F042x6)
 	make_bin_file(${TGTNAME}_fw)
 	dfu_flash(${TGTNAME}_fw)
 	show_object_size(${TGTNAME}_fw)
+endfunction()
+
+function(add_f042_target TGTNAME)
+	add_target_common(${TGTNAME} STM32F042X6)
+	target_compile_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
+	target_compile_definitions(${TGTNAME}_fw PRIVATE BOARD_${TGTNAME} STM32F0)
+	target_sources(${TGTNAME}_fw PRIVATE "src/device/device_f0.c")
+	target_link_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
+	target_link_libraries(${TGTNAME}_fw PRIVATE STM32_HAL_STM32F042x6 STM32_USB_Device_Library_STM32F042x6)
 endfunction()
 
 function(add_f072_target TGTNAME)
-	set(CPU_FAMILY STM32F072XB)
-	add_executable(${TGTNAME}_fw ${SOURCE_FILES})
-	add_dependencies(${TGTNAME}_fw version_h)
-	target_include_directories(${TGTNAME}_fw PRIVATE include/ ${CMAKE_CURRENT_BINARY_DIR})
+	add_target_common(${TGTNAME} STM32F072XB)
 	target_compile_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
 	target_compile_definitions(${TGTNAME}_fw PRIVATE BOARD_${TGTNAME} STM32F0)
+	target_sources(${TGTNAME}_fw PRIVATE "src/device/device_f0.c")
 	target_link_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F0})
-	target_link_options(${TGTNAME}_fw PRIVATE -T ${CPU_FAMILY}_processed.ld)
 	target_link_libraries(${TGTNAME}_fw PRIVATE STM32_HAL_STM32F072xB STM32_USB_Device_Library_STM32F072xB)
-	make_bin_file(${TGTNAME}_fw)
-	dfu_flash(${TGTNAME}_fw)
-	show_object_size(${TGTNAME}_fw)
+
 endfunction()
 
 function(add_f407_target TGTNAME)
-	set(CPU_FAMILY STM32F407XE)
-	add_executable(${TGTNAME}_fw ${SOURCE_FILES})
-	add_dependencies(${TGTNAME}_fw version_h)
-	target_include_directories(${TGTNAME}_fw PRIVATE include/ ${CMAKE_CURRENT_BINARY_DIR})
+	add_target_common(${TGTNAME} STM32F407XE)
 	target_compile_definitions(${TGTNAME}_fw PRIVATE BOARD_${TGTNAME} STM32F4)
 	target_compile_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F4})
+	target_sources(${TGTNAME}_fw PRIVATE "src/device/device_f4.c")
 	target_link_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_F4})
-	target_link_options(${TGTNAME}_fw PRIVATE -T ${CPU_FAMILY}_processed.ld)
 	target_link_libraries(${TGTNAME}_fw PRIVATE STM32_HAL_STM32F407xE STM32_USB_Device_Library_STM32F407xE)
-	make_bin_file(${TGTNAME}_fw)
-	dfu_flash(${TGTNAME}_fw)
-	show_object_size(${TGTNAME}_fw)
 endfunction()
 
 function(add_g0b1_target TGTNAME)
-	set(CPU_FAMILY STM32G0B1XK)
-	add_executable(${TGTNAME}_fw ${SOURCE_FILES})
-	add_dependencies(${TGTNAME}_fw version_h)
-	target_include_directories(${TGTNAME}_fw PRIVATE include/ ${CMAKE_CURRENT_BINARY_DIR})
+	add_target_common(${TGTNAME} STM32G0B1XK)
 	target_compile_definitions(${TGTNAME}_fw PRIVATE BOARD_${TGTNAME} STM32G0)
 	target_compile_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_G0})
+	target_sources(${TGTNAME}_fw PRIVATE "src/device/device_g0.c")
 	target_link_options(${TGTNAME}_fw BEFORE PRIVATE ${CPUFLAGS_G0})
-	target_link_options(${TGTNAME}_fw PRIVATE -T ${CPU_FAMILY}_processed.ld)
 	target_link_libraries(${TGTNAME}_fw PRIVATE STM32_HAL_STM32G0B1xK STM32_USB_Device_Library_STM32G0B1xK)
-	make_bin_file(${TGTNAME}_fw)
-	dfu_flash(${TGTNAME}_fw)
-	show_object_size(${TGTNAME}_fw)
 endfunction()
 
 ########## generate list of targets.
 # the "_fw" part is appended automatically
 set(TGTF042_LIST "cantact" "canalyze" "canable" "usb2can" "cannette")
-set(TGTF072_LIST "candleLight" "CANable_MKS" "CONVERTDEVICE_xCAN01")
+set(TGTF072_LIST "candleLight" "CANable_MKS" "CONVERTDEVICE_xCAN")
 set(TGTF407_LIST "STM32F4_DevBoard")
 set(TGTG0B1_LIST "budgetcan")
 
@@ -292,7 +279,7 @@ foreach (TGTNAME IN LISTS TGTF407_LIST)
 endforeach()
 
 foreach (TGTNAME IN LISTS TGTG0B1_LIST)
-	option(BUILD_${TGTNAME} "Build firmware for \"${TGTNAME}\" (default=yes)" OFF)
+	option(BUILD_${TGTNAME} "Build firmware for \"${TGTNAME}\" (default=yes)" ON)
 	if (BUILD_${TGTNAME})
 		add_g0b1_target(${TGTNAME})
 	endif()
